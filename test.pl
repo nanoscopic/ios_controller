@@ -5,21 +5,47 @@ use LWP;
 use JSON::PP qw/decode_json/;
 use Data::Dumper;
 
-my $base = "http://localhost:8100";
+my $base = "http://10.0.0.211:8100";
 
 my $agent = LWP::UserAgent->new();
 
-#my $sid = get_session_id();
+#my $sid = session();
 #print "Sid: $sid\n";
 
 #source();
-#get_apps_list();
+#apps_list();
 #my $src = get_battery_info();
+#window_size( $sid );
+#control_center( $sid );
 
-#my $sid = create_session( "com.apple.Preferences" );
-#my $devEl = el_by_name( $sid, 'General' );
+my $sid = create_session( "com.apple.Preferences" );
+#my $sid = create_session( "com.dryark.vidtest2" );
+#apps_list();
+
+#my $devEl = el_by_name( $sid, 'Screen Recording' );
+#force_touch( $sid, $devEl );
+
+#my $devEl = el_by_name( $sid, 'vidtest2' );
 #click( $sid, $devEl );
-reset_media_services();
+
+#my $devEl = el_by_name( $sid, 'Start Broadcast' );
+#click( $sid, $devEl );
+
+#click( $sid, $devEl );
+#reset_media_services();
+start_broadcast( $sid, "vidtest2" );
+
+sub start_broadcast {
+  my ( $sid, $app_name ) = @_;
+  $sid ||= session();
+  control_center( $sid );
+  my $devEl = el_by_name( $sid, 'Screen Recording' );
+  force_touch( $sid, $devEl );
+  $devEl = el_by_name( $sid, $app_name );
+  click( $sid, $devEl );
+  $devEl = el_by_name( $sid, 'Start Broadcast' );
+  click( $sid, $devEl );
+}
 
 sub reset_media_services {
   my $sid = create_session( "com.apple.Preferences" );
@@ -32,6 +58,7 @@ sub reset_media_services {
   #scroll_to_name( $sid, $devEl, 'Developer' );
   scroll_to_visible( $sid, $devEl );
   click( $sid, $devEl );
+  #force_touch( $sid, $devEl );
   #sleep(2);
   #print "Done sleep\n";
   
@@ -84,6 +111,17 @@ sub el_by_type {
   return $res->{'ELEMENT'};
 }
 
+sub force_touch {
+  my ( $sid, $eid ) = @_;
+  my $json = qq`{
+    "duration": 1,
+    "pressure": 1000
+  }`;
+  my $res = resp_to_val( $agent->post( "$base/session/$sid/wda/element/$eid/forceTouch", 'Content-type' => 'application/json', Content => $json ) );
+  #print Dumper( $res );
+  #return $res->{'ELEMENT'};
+}
+
 sub click {
   my ( $sid, $eid ) = @_;
   my $resp = $agent->post( "$base/session/$sid/element/$eid/click", 'Content-type' => 'application/json', Content => '{}' );
@@ -121,6 +159,49 @@ sub swipeDown {
   }`;
   my $res = resp_to_val( $agent->post( "$base/session/$sid/wda/element/0/swipe", 'Content-type' => 'application/json', Content => $json ) );
   #print Dumper( $res );
+}
+
+sub control_center {
+  my ( $sid ) = @_;
+  my $size = window_size( $sid );
+  my $midx = int( $size->{width} / 2 );
+  my $maxy = $size->{height}-1;
+  touch_perform( $sid, $midx, $maxy, $midx, $maxy - 100 ); 
+}
+
+sub touch_perform {
+  my ( $sid, $x1, $y1, $x2, $y2 ) = @_;
+  print "Swiping from $x1,$y1 to $x2,$y2\n";
+  my $json = qq`{
+    "actions": [
+      {
+        "action": "press",
+        "options": {
+          "x":$x1,
+          "y":$y1
+        }
+      },
+      {
+        "action":"wait",
+        "options": {
+          "ms": 500
+        }
+      },
+      {
+        "action": "moveTo",
+        "options": {
+          "x":$x2,
+          "y":$y2
+        }
+      },
+      {
+        "action":"release",
+        "options":{}
+      }
+    ]
+  }`;
+  my $res = resp_to_val( $agent->post( "$base/session/$sid/wda/touch/perform", 'Content-type' => 'application/json', Content => $json ) );
+  print Dumper( $res );
 }
 
 sub scroll_to_name {
@@ -199,6 +280,14 @@ sub apps_list {
   $sid = session() if( !$sid );
   my $res = resp_to_val( $agent->get( "$base/session/$sid/wda/apps/list" ) );
   print Dumper( $res );
+}
+
+sub window_size {
+  my $sid = shift;
+  $sid = session() if( !$sid );
+  my $res = resp_to_val( $agent->get( "$base/session/$sid/window/size" ) );
+  print Dumper( $res );
+  return $res;
 }
 
 sub battery_info {
