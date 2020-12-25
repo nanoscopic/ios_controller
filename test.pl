@@ -5,7 +5,7 @@ use LWP;
 use JSON::PP qw/decode_json/;
 use Data::Dumper;
 
-my $base = "http://10.0.0.211:8100";
+my $base = "http://10.0.0.140:8100";
 
 my $agent = LWP::UserAgent->new();
 
@@ -33,7 +33,8 @@ my $sid = create_session( "com.apple.Preferences" );
 
 #click( $sid, $devEl );
 #reset_media_services();
-start_broadcast( $sid, "vidtest2" );
+#start_broadcast( $sid, "vidtest2" );
+control_center2( $sid );
 
 sub start_broadcast {
   my ( $sid, $app_name ) = @_;
@@ -169,6 +170,13 @@ sub control_center {
   touch_perform( $sid, $midx, $maxy, $midx, $maxy - 100 ); 
 }
 
+sub control_center2 {
+  my ( $sid ) = @_;
+  my $size = window_size( $sid );
+  my $maxx = $size->{width}-1;
+  touch_perform( $sid, $maxx, 0, $maxx, 100 ); 
+}
+
 sub touch_perform {
   my ( $sid, $x1, $y1, $x2, $y2 ) = @_;
   print "Swiping from $x1,$y1 to $x2,$y2\n";
@@ -201,6 +209,19 @@ sub touch_perform {
     ]
   }`;
   my $res = resp_to_val( $agent->post( "$base/session/$sid/wda/touch/perform", 'Content-type' => 'application/json', Content => $json ) );
+  print Dumper( $res );
+}
+
+sub launch_app {
+  my ( $sid, $app ) = @_;
+  print "Launching app $app\n";
+  my $json = qq`{
+    "bundleId": "$app",
+    "shouldWaitForQuiescence": false,
+    "arguments": [],
+    "environment": []
+  }`;
+  my $res = resp_to_val( $agent->post( "$base/session/$sid/wda/apps/launch", 'Content-type' => 'application/json', Content => $json ) );
   print Dumper( $res );
 }
 
